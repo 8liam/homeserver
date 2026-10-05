@@ -4,7 +4,7 @@ Setup scripts for my Mac mini home server.
 
 ## fresh-mac.sh
 
-One-shot setup for a brand-new Apple Silicon Mac. Shows a GARMIN banner, asks `y/N`, then does everything in parallel with live progress bars.
+One-shot setup for a brand-new Apple Silicon Mac. Shows a BOSSMAN banner, asks `y/N`, then does everything in parallel with live progress bars.
 
 ### Run it
 
