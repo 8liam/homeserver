@@ -18,7 +18,7 @@ Use that form rather than `curl ... | zsh`, so the script can still read your `y
 
 - Wipes every icon from the Dock (and turns off "recent apps"), then pins Ghostty, Helium, T3 Code and Tailscale once they're installed
 - Installs [Homebrew](https://brew.sh) (plus Xcode Command Line Tools) and `git`
-- Installs Docker Desktop, Apple [`container`](https://github.com/apple/container) (and starts its services), and Ghostty, Claude Code, and opencode via Homebrew
+- Installs Docker Desktop, Apple [`container`](https://github.com/apple/container) (and starts its services), and Ghostty, Node (with npm), Claude Code, and opencode via Homebrew
 - Downloads the latest [Helium](https://github.com/imputnet/helium-macos) and [T3 Code](https://github.com/pingdotgg/t3code) arm64 `.dmg`s, installs them, and sets Helium as the default browser
 - Installs [Tailscale](https://tailscale.com) (standalone build)
 - Launches each app once it's installed

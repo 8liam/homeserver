@@ -1,11 +1,11 @@
 #!/bin/zsh
-# fresh-mac.sh - nuke the Dock, then install Homebrew + git, Docker, Apple container, Ghostty, Claude Code, opencode, Helium (+default browser), T3 Code, and Tailscale in parallel.
+# fresh-mac.sh - nuke the Dock, then install Homebrew + git, Docker, Apple container, Ghostty, Node/npm, Claude Code, opencode, Helium (+default browser), T3 Code, and Tailscale in parallel.
 
 APPS_DIR=/Applications
 T=$(mktemp -d)
 typeset -A STATE_LABEL
-ids=(dock brew docker container ghostty claude opencode helium t3 tailscale)
-STATE_LABEL=(dock "Dock" brew "Homebrew" docker "Docker" container "Container" ghostty "Ghostty" claude "Claude Code" opencode "opencode" helium "Helium" t3 "T3 Code" tailscale "Tailscale")
+ids=(dock brew docker container ghostty node claude opencode helium t3 tailscale)
+STATE_LABEL=(dock "Dock" brew "Homebrew" docker "Docker" container "Container" ghostty "Ghostty" node "Node + npm" claude "Claude Code" opencode "opencode" helium "Helium" t3 "T3 Code" tailscale "Tailscale")
 
 cleanup() { printf '\033[?25h'; [[ -n $SUDO_PID ]] && kill $SUDO_PID 2>/dev/null; rm -rf "$T"; }
 trap cleanup EXIT
@@ -118,6 +118,14 @@ job_ghostty() {
   HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install --cask ghostty
   open -a Ghostty
   set_state ghostty done "Installed & launched"
+}
+
+job_node() {
+  set_state node run "Waiting for Homebrew"
+  wait_brew
+  set_state node run "Installing"
+  HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install node
+  set_state node done "Installed (node + npm)"
 }
 
 job_claude() {
@@ -240,7 +248,7 @@ cat <<'EOF2'
   This will:
     - wipe your Dock, then pin Ghostty, Helium, T3 Code, and Tailscale
     - install Homebrew + git, Docker, Apple container, Ghostty,
-      Claude Code, opencode, Helium (set as default browser),
+      Node/npm, Claude Code, opencode, Helium (default browser),
       T3 Code, and Tailscale
     - launch the apps when they finish
 EOF2
