@@ -1,11 +1,11 @@
 #!/bin/zsh
-# fresh-mac.sh - nuke the Dock, then install Homebrew + git, Docker, Apple container, Ghostty, Helium (+default browser), T3 Code, and Tailscale in parallel.
+# fresh-mac.sh - nuke the Dock, then install Homebrew + git, Docker, Apple container, Ghostty, Claude Code, opencode, Helium (+default browser), T3 Code, and Tailscale in parallel.
 
 APPS_DIR=/Applications
 T=$(mktemp -d)
 typeset -A STATE_LABEL
-ids=(dock brew docker container ghostty helium t3 tailscale)
-STATE_LABEL=(dock "Dock" brew "Homebrew" docker "Docker" container "Container" ghostty "Ghostty" helium "Helium" t3 "T3 Code" tailscale "Tailscale")
+ids=(dock brew docker container ghostty claude opencode helium t3 tailscale)
+STATE_LABEL=(dock "Dock" brew "Homebrew" docker "Docker" container "Container" ghostty "Ghostty" claude "Claude Code" opencode "opencode" helium "Helium" t3 "T3 Code" tailscale "Tailscale")
 
 cleanup() { printf '\033[?25h'; [[ -n $SUDO_PID ]] && kill $SUDO_PID 2>/dev/null; rm -rf "$T"; }
 trap cleanup EXIT
@@ -19,11 +19,13 @@ load_brew() {
   return 1
 }
 
-wait_brew() {
+wait_for() { # id -> 0 if that job finished successfully
   local n=0
-  until [[ -f $T/brew.s && $(<"$T/brew.s") == (done|fail)* ]] || (( n++ > 3000 )); do sleep 1; done
-  [[ $(<"$T/brew.s") == done* ]] && load_brew
+  until [[ -f $T/$1.s && $(<"$T/$1.s") == (done|fail)* ]] || (( n++ > 3000 )); do sleep 1; done
+  [[ $(<"$T/$1.s") == done* ]]
 }
+
+wait_brew() { wait_for brew && load_brew; }
 
 set_state() { print -r -- "$2|$3" > "$T/$1.s"; }
 
@@ -57,7 +59,23 @@ job_dock() {
   defaults write com.apple.dock persistent-others -array
   defaults write com.apple.dock show-recents -bool false
   killall Dock || true
-  set_state dock done "Dock is empty"
+  set_state dock run "Waiting for apps to pin"
+  wait_brew || true
+  local id app pinned=0
+  for id in ghostty helium t3 tailscale; do
+    wait_for $id || continue
+    case $id in
+      ghostty) app="$APPS_DIR/Ghostty.app" ;;
+      helium) app="$APPS_DIR/Helium.app" ;;
+      t3) app=("$APPS_DIR"/T3\ Code*.app(N[1])) ;;
+      tailscale) app="$APPS_DIR/Tailscale.app" ;;
+    esac
+    if command -v dockutil >/dev/null && [[ -d $app ]]; then
+      dockutil --add "$app" --no-restart && pinned=$((pinned + 1))
+    fi
+  done
+  killall Dock || true
+  set_state dock done "Dock cleared, $pinned apps pinned"
 }
 
 job_brew() {
@@ -69,8 +87,8 @@ job_brew() {
     local rc='eval "$(/opt/homebrew/bin/brew shellenv)"'
     [[ -x /opt/homebrew/bin/brew ]] && ! grep -qs "brew shellenv" ~/.zprofile && print -r -- "$rc" >> ~/.zprofile
   fi
-  set_state brew run "brew install git defaultbrowser"
-  HOMEBREW_NO_AUTO_UPDATE=1 brew install git defaultbrowser
+  set_state brew run "brew install git defaultbrowser dockutil"
+  HOMEBREW_NO_AUTO_UPDATE=1 brew install git defaultbrowser dockutil
   set_state brew done "Homebrew + git ready"
 }
 
@@ -100,6 +118,22 @@ job_ghostty() {
   HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install --cask ghostty
   open -a Ghostty
   set_state ghostty done "Installed & launched"
+}
+
+job_claude() {
+  set_state claude run "Waiting for Homebrew"
+  wait_brew
+  set_state claude run "Installing"
+  HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install --cask claude-code
+  set_state claude done "Installed (run: claude)"
+}
+
+job_opencode() {
+  set_state opencode run "Waiting for Homebrew"
+  wait_brew
+  set_state opencode run "Installing"
+  HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install opencode
+  set_state opencode done "Installed (run: opencode)"
 }
 
 job_helium() {
@@ -178,7 +212,7 @@ render() { # frame -> sets $buf and $all_done
     s=""; [[ -f $T/$i.s ]] && s=$(<"$T/$i.s")
     [[ -n $s ]] || s="run|Starting"
     phase=${s%%|*}; msg=${s#*|}
-    line="${(r:10:)STATE_LABEL[$i]}"
+    line="${(r:12:)STATE_LABEL[$i]}"
     case $phase in
       done) buf+="  ${C}32m✔${R}  ${C}1m${line}${R}${C}32m${msg}${R}"$'\n' ;;
       fail) buf+="  ${C}31m✘${R}  ${C}1m${line}${R}${C}31m${msg}${R}"$'\n'; ;;
@@ -204,9 +238,10 @@ for line in $banner; do printf '  \033[38;5;124m%s\033[0m\n' "$line"; done
 printf '  \033[38;5;240mabandon all dock icons, ye who enter\033[0m\n\n'
 cat <<'EOF2'
   This will:
-    - wipe every icon from your Dock
+    - wipe your Dock, then pin Ghostty, Helium, T3 Code, and Tailscale
     - install Homebrew + git, Docker, Apple container, Ghostty,
-      Helium (set as default browser), T3 Code, and Tailscale
+      Claude Code, opencode, Helium (set as default browser),
+      T3 Code, and Tailscale
     - launch the apps when they finish
 EOF2
 printf '\n  \033[1mProceed?\033[0m [y/N] '
