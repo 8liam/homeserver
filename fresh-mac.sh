@@ -1,11 +1,11 @@
 #!/bin/zsh
-# fresh-mac.sh - nuke the Dock, then install Homebrew + git, Docker, Apple container, Ghostty, Node/npm, Claude Code, opencode, Helium (+default browser), T3 Code, and Tailscale in parallel.
+# fresh-mac.sh - nuke the Dock, then install Homebrew + git, Docker, Apple container, Ghostty, nvm + Node LTS (npm), Claude Code, opencode, Helium (+default browser), T3 Code, and Tailscale in parallel.
 
 APPS_DIR=/Applications
 T=$(mktemp -d)
 typeset -A STATE_LABEL
 ids=(dock brew docker container ghostty node claude opencode helium t3 tailscale)
-STATE_LABEL=(dock "Dock" brew "Homebrew" docker "Docker" container "Container" ghostty "Ghostty" node "Node + npm" claude "Claude Code" opencode "opencode" helium "Helium" t3 "T3 Code" tailscale "Tailscale")
+STATE_LABEL=(dock "Dock" brew "Homebrew" docker "Docker" container "Container" ghostty "Ghostty" node "nvm + Node" claude "Claude Code" opencode "opencode" helium "Helium" t3 "T3 Code" tailscale "Tailscale")
 
 cleanup() { printf '\033[?25h'; [[ -n $SUDO_PID ]] && kill $SUDO_PID 2>/dev/null; rm -rf "$T"; }
 trap cleanup EXIT
@@ -123,9 +123,24 @@ job_ghostty() {
 job_node() {
   set_state node run "Waiting for Homebrew"
   wait_brew
-  set_state node run "Installing"
-  HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install node
-  set_state node done "Installed (node + npm)"
+  set_state node run "Installing nvm"
+  HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install nvm
+  export NVM_DIR="$HOME/.nvm"
+  mkdir -p "$NVM_DIR"
+  if ! grep -qs "nvm.sh" ~/.zshrc ~/.zprofile; then
+    cat >> ~/.zshrc <<'NVMRC'
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$HOMEBREW_PREFIX/opt/nvm/nvm.sh" ] && \. "$HOMEBREW_PREFIX/opt/nvm/nvm.sh"
+NVMRC
+  fi
+  unsetopt ERR_EXIT   # nvm isn't errexit-safe
+  source "$(brew --prefix nvm)/nvm.sh" || return 1
+  set_state node run "Installing latest LTS Node"
+  nvm install --lts || return 1
+  nvm alias default 'lts/*' || return 1
+  nvm use default || return 1
+  set_state node done "nvm + Node $(node -v) (LTS, default), npm $(npm -v)"
 }
 
 job_claude() {
@@ -248,7 +263,7 @@ cat <<'EOF2'
   This will:
     - wipe your Dock, then pin Ghostty, Helium, T3 Code, and Tailscale
     - install Homebrew + git, Docker, Apple container, Ghostty,
-      Node/npm, Claude Code, opencode, Helium (default browser),
+      nvm + Node LTS (npm), Claude Code, opencode, Helium (default browser),
       T3 Code, and Tailscale
     - launch the apps when they finish
 EOF2
